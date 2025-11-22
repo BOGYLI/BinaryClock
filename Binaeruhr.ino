@@ -7,12 +7,11 @@
 //        KONSTANTEN & VARIABLEN
 // ----------------------------------------------------
 
-const char* apSSID     = "BinaryClock";
-const char* apPassword = "BC123456";
+const char* apSSID     = "BinaryClock"; // Name des eigenen WLAN Access Points des Microcontrollers
+const char* apPassword = "BC123456"; // Passwort des Access Points
 
-const char* ntpServer = "pool.ntp.org";
-const long gmtOffsetSec = 3600;
-const int daylightOffsetSec = 0;
+const char* ntpServer = "pool.ntp.org"; // URL des Zeitservers
+const char* TZ_DE = "CET-1CEST,M3.5.0,M10.5.0/3"; // Zeitzone für Deutschland
 
 ESP8266WebServer server(80);
 
@@ -25,7 +24,7 @@ unsigned long Sekunden = 0;
 int Minuten = 0;
 int Stunden = 0;
 
-// LED-Pins
+// LED-PINs müssen umnummeriert werden, weil sich ESP und Arduino (bei tinkercad) unterscheiden.
 int PIN0 = 16;
 int PIN1 = 5;
 int PIN2 = 4;
@@ -145,7 +144,7 @@ void handleStatus() {
 // ----------------------------------------------------
 
 void syncTime() {
-  configTime(gmtOffsetSec, daylightOffsetSec, ntpServer);
+  configTzTime(TZ_DE, ntpServer);
 
   struct tm t;
   if (!getLocalTime(&t)) {
@@ -211,8 +210,8 @@ void setup() {
   server.on("/status", handleStatus);
   server.begin();
 
-  int pins[] = {PIN0,PIN1,PIN2,PIN3,PIN4,PIN5,PIN6,PIN7,PIN8,PIN9,PIN10};
-  for (int p : pins) pinMode(p, OUTPUT);
+  int PINs[] = {PIN0,PIN1,PIN2,PIN3,PIN4,PIN5,PIN6,PIN7,PIN8,PIN9,PIN10};
+  for (int p : PINs) pinMode(p, OUTPUT);
 }
 
 // ----------------------------------------------------
@@ -222,38 +221,90 @@ void setup() {
 void loop() {
   server.handleClient();
 
-  if (WiFi.status() == WL_CONNECTED) {
-    Sekunden++;
-    if (Sekunden >= 24 * 3600) Sekunden = 0;
+  // Nach einem Tag werden sie Sekunden zurückgesetzt.
+  if (Sekunden >= 24 * (60 * 60)) {
+    Sekunden = 0;
   }
+  // Um 3 Uhr nachts wird die Zeit mit dem Server synchronisiert.
+  if  (Sekunden == 3 * (60 * 60)) {
+    connectToWifi();
+  }
+  Minuten = ((Sekunden % 3600) / 60);
+  Stunden = (Sekunden / 3600);
 
-  Minuten = (Sekunden % 3600) / 60;
-  Stunden = Sekunden / 3600;
-
-  // LED-Logik identisch wie in deinem Original
+  // Jede Lampengruppe (3 LED's) leuchtet 5ms => zusammen 20ms.
+  // Das wird 50 mal wiederholt => Gesamtzeit 1s.
   for (int i=0; i<50; i++) {
-
-    digitalWrite(PIN0, Minuten & 1);
-    digitalWrite(PIN1, Minuten & 2);
-    digitalWrite(PIN2, Minuten & 4);
-    delay(5);
-    digitalWrite(PIN0, LOW); digitalWrite(PIN1, LOW); digitalWrite(PIN2, LOW);
-
-    digitalWrite(PIN3, Minuten & 8);
-    digitalWrite(PIN4, Minuten & 16);
-    digitalWrite(PIN5, Minuten & 32);
-    delay(5);
-    digitalWrite(PIN3, LOW); digitalWrite(PIN4, LOW); digitalWrite(PIN5, LOW);
-
-    digitalWrite(PIN6, Stunden & 1);
-    digitalWrite(PIN7, Stunden & 2);
-    digitalWrite(PIN8, Stunden & 4);
-    delay(5);
-    digitalWrite(PIN6, LOW); digitalWrite(PIN7, LOW); digitalWrite(PIN8, LOW);
-
-    digitalWrite(PIN9, Stunden & 8);
-    digitalWrite(PIN10, Stunden & 16);
-    delay(5);
-    digitalWrite(PIN9, LOW); digitalWrite(PIN10, LOW);
+    if (Minuten % 2 >= 1) {
+      digitalWrite(PIN0, HIGH);
+    } else {
+      digitalWrite(PIN0, LOW);
+    }
+    if (Minuten % 4 >= 2) {
+      digitalWrite(PIN1, HIGH);
+    } else {
+      digitalWrite(PIN1, LOW);
+    }
+    if (Minuten % 8 >= 4) {
+      digitalWrite(PIN2, HIGH);
+    } else {
+      digitalWrite(PIN2, LOW);
+    }
+    delay(5); // Warte 5 Millisekunden
+    digitalWrite(PIN0, LOW);
+    digitalWrite(PIN1, LOW);
+    digitalWrite(PIN2, LOW);
+    if (Minuten % 16 >= 8) {
+      digitalWrite(PIN3, HIGH);
+    } else {
+      digitalWrite(PIN3, LOW);
+    }
+    if (Minuten % 32 >= 16) {
+      digitalWrite(PIN4, HIGH);
+    } else {
+      digitalWrite(PIN4, LOW);
+    }
+    if (Minuten % 64 >= 32) {
+      digitalWrite(PIN5, HIGH);
+    } else {
+      digitalWrite(PIN5, LOW);
+    }
+    delay(5); // Warte 5 Millisekunden
+    digitalWrite(PIN3, LOW);
+    digitalWrite(PIN4, LOW);
+    digitalWrite(PIN5, LOW);
+    if (Stunden % 2 >= 1) {
+      digitalWrite(PIN6, HIGH);
+    } else {
+      digitalWrite(PIN6, LOW);
+    }
+    if (Stunden % 4 >= 2) {
+      digitalWrite(PIN7, HIGH);
+    } else {
+      digitalWrite(PIN7, LOW);
+    }
+    if (Stunden % 8 >= 4) {
+      digitalWrite(PIN8, HIGH);
+    } else {
+      digitalWrite(PIN8, LOW);
+    }
+    delay(5); // Warte 5 Millisekunden
+    digitalWrite(PIN6, LOW);
+    digitalWrite(PIN7, LOW);
+    digitalWrite(PIN8, LOW);
+    if (Stunden % 16 >= 8) {
+      digitalWrite(PIN9, HIGH);
+    } else {
+      digitalWrite(PIN9, LOW);
+    }
+    if (Stunden % 32 >= 16) {
+      digitalWrite(PIN10, HIGH);
+    } else {
+      digitalWrite(PIN10, LOW);
+    }
+    delay(5); // Warte 5 Millisekunden
+    digitalWrite(PIN9, LOW);
+    digitalWrite(PIN10, LOW);
   }
+  Sekunden += 1;
 }
